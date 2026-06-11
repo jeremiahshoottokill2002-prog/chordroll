@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#1f2225" />
+<link rel="manifest" href="manifest.webmanifest" />
+<title>ChordRoll — chord progressions, FL Studio style</title>
+<meta name="description" content="100+ chord progressions across every genre — afrobeats, amapiano, dancehall, reggae, hip hop, trap, gospel and more — drawn as an FL Studio-style piano roll. Works offline." />
+<style>
+  :root{
+    --bg:#1f2225;
+    --panel:#26292d;
+    --panel-2:#2c3035;
+    --line:#3a3f45;
+    --grid-white:#33373c;
+    --grid-black:#2b2f33;
+    --grid-beat:#3d4248;
+    --grid-bar:#15171a;
+    --note:#8fd14f;
+    --note-edge:#5f9c2e;
+    --note-text:#1c2a10;
+    --bass:#5ab7c4;
+    --bass-edge:#3b858f;
+    --accent:#ff9b3d;
+    --text:#d8dcdf;
+    --text-dim:#8b9197;
+    --radius:6px;
+    --mono:ui-monospace,'JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+    --sans:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  select{font-family:inherit}
+
+  .wrap{max-width:980px;margin:0 auto;padding:12px 12px 80px}
+
+  header{display:flex;align-items:baseline;gap:10px;padding:10px 2px 14px;flex-wrap:wrap}
+  .logo{font-family:var(--mono);font-weight:700;font-size:1.25rem;letter-spacing:.02em}
+  .logo .roll{color:var(--note)}
+  .tag{color:var(--text-dim);font-size:.78rem}
+
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);padding:8px}
+  .ctl{display:flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:var(--radius);padding:6px 8px}
+  .ctl label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
+  .ctl select,.ctl input{background:#1b1d20;color:var(--text);border:1px solid var(--line);
+    border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:.9rem}
+  .ctl input[type=number]{width:62px}
+  .ctl input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+
+  .play-btn{display:flex;align-items:center;gap:8px;background:var(--accent);color:#231203;
+    font-weight:700;border-radius:var(--radius);padding:9px 18px;font-size:.95rem;
+    box-shadow:0 2px 0 #b35f12}
+  .play-btn:active{transform:translateY(1px);box-shadow:0 1px 0 #b35f12}
+  .play-btn.playing{background:#e8533f;box-shadow:0 2px 0 #8f2d1f;color:#fff}
+
+  .roll-panel{margin-top:12px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);overflow:hidden}
+  .roll-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;padding:10px 12px;
+    border-bottom:1px solid var(--line);background:linear-gradient(#2d3136,#26292d)}
+  .roll-head h1{font-size:1rem;font-weight:600}
+  .roll-head .numerals{font-family:var(--mono);color:var(--accent);font-size:.85rem}
+  .roll-head .chordline{font-family:var(--mono);color:var(--text-dim);font-size:.8rem;width:100%}
+
+  .roll-scroll{overflow-x:auto;overscroll-behavior-x:contain;position:relative;background:var(--grid-black)}
+  .roll-inner{display:flex;position:relative;width:max-content}
+
+  .keys{position:sticky;left:0;z-index:5;width:46px;flex:none;
+    box-shadow:2px 0 6px rgba(0,0,0,.45)}
+  .key{height:var(--rh);display:flex;align-items:center;justify-content:flex-end;
+    padding-right:5px;font-family:var(--mono);font-size:9.5px;border-bottom:1px solid #0e0f11}
+  .key.white{background:#e9e9e6;color:#6a6a6a}
+  .key.black{background:#1b1d1f;color:#777}
+  .key.c-note{color:#1d1d1d;font-weight:700}
+
+  .grid{position:relative;flex:none}
+  .row{position:absolute;left:0;right:0;height:var(--rh)}
+  .row.white{background:var(--grid-white)}
+  .row.black{background:var(--grid-black)}
+  .row.c-line{border-bottom:1px solid #46505a}
+  .vline{position:absolute;top:0;bottom:0;width:1px;background:var(--grid-beat)}
+  .vline.bar{width:2px;background:var(--grid-bar)}
+
+  .note{position:absolute;height:calc(var(--rh) - 2px);margin-top:1px;
+    background:linear-gradient(#a7e36b,var(--note) 40%,#7cbb43);
+    border:1px solid var(--note-edge);border-radius:3px;
+    display:flex;align-items:center;padding-left:5px;
+    font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--note-text);
+    overflow:hidden;white-space:nowrap;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 2px rgba(0,0,0,.4)}
+  .note.bass{background:linear-gradient(#8fd5de,var(--bass) 40%,#46969f);
+    border-color:var(--bass-edge);color:#0c2326}
+
+  .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);
+    box-shadow:0 0 6px var(--accent);z-index:4;display:none}
+
+  .barnum{position:absolute;top:0;height:16px;display:flex;align-items:center;
+    font-family:var(--mono);font-size:9px;color:var(--text-dim);padding-left:4px;z-index:3}
+
+  .filter-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--text-dim);margin:14px 2px 0}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:6px 0;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;padding:7px 13px;border-radius:999px;border:1px solid var(--line);
+    background:var(--panel);font-size:.82rem;color:var(--text-dim);white-space:nowrap}
+  .chip.active{background:var(--note);border-color:var(--note-edge);color:#1c2a10;font-weight:700}
+  .chips.moods .chip.active{background:var(--accent);border-color:#b35f12;color:#231203}
+
+  .count{color:var(--text-dim);font-size:.75rem;margin:6px 2px 0}
+
+  .list{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
+  @media(min-width:680px){.list{grid-template-columns:1fr 1fr}}
+  .card{text-align:left;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:11px 12px;display:flex;flex-direction:column;gap:5px;
+    transition:border-color .12s}
+  .card:hover{border-color:#555c64}
+  .card.active{border-color:var(--note);box-shadow:0 0 0 1px var(--note-edge)}
+  .card .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .card .name{font-weight:600;font-size:.92rem}
+  .card .genre-tag{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--bass)}
+  .card .mood{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+  .card .nums{font-family:var(--mono);font-size:.85rem;color:var(--note)}
+  .card .in-key{font-family:var(--mono);font-size:.78rem;color:var(--text-dim)}
+
+  footer{margin-top:28px;color:var(--text-dim);font-size:.75rem;line-height:1.5;
+    border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">Chord<span class="roll">Roll</span></div>
+    <div class="tag">100+ progressions · every genre · drawn like your piano roll · works offline</div>
+  </header>
+
+  <div class="controls">
+    <button class="play-btn" id="playBtn">▶ Play</button>
+    <div class="ctl">
+      <label for="keySel">Key</label>
+      <select id="keySel"></select>
+    </div>
+    <div class="ctl">
+      <label for="bpm">BPM</label>
+      <input type="number" id="bpm" value="100" min="40" max="220" />
+    </div>
+    <div class="ctl">
+      <label for="loop">Loop</label>
+      <input type="checkbox" id="loop" checked />
+    </div>
+  </div>
+
+  <section class="roll-panel">
+    <div class="roll-head">
+      <h1 id="progName"></h1>
+      <span class="numerals" id="progNums"></span>
+      <span class="chordline" id="progChords"></span>
+    </div>
+    <div class="roll-scroll" id="rollScroll">
+      <div class="roll-inner" id="rollInner"></div>
+    </div>
+  </section>
+
+  <div class="filter-label">Genre</div>
+  <nav class="chips" id="genreChips"></nav>
+  <div class="filter-label">Mood</div>
+  <nav class="chips moods" id="moodChips"></nav>
+  <div class="count" id="count"></div>
+  <div class="list" id="list"></div>
+
+  <footer>
+    Green = chord tones · teal = bass note · one chord per bar. Pick a progression, set your
+    key, and copy the notes straight into FL Studio, Cubase, or any DAW. Some progressions
+    appear in more than one genre on purpose — that's their shared DNA. Classic turnarounds
+    adapted from Walter Stuart's <em>1500 Chord Progressions</em> (1958). Install this page to
+    your home screen and it works with no internet.
+  </footer>
+</div>
+
+<script>
+/* ================= music theory ================= */
+const SHARP=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FLAT =['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const FLAT_KEYS=new Set([1,3,5,8,10]);
+
+const Q={
+  '':[0,4,7],        'm':[0,3,7],       '7':[0,4,7,10],   'maj7':[0,4,7,11],
+  'm7':[0,3,7,10],   '6':[0,4,7,9],     'm6':[0,3,7,9],   'dim':[0,3,6],
+  'dim7':[0,3,6,9],  'm7b5':[0,3,6,10], 'sus4':[0,5,7],   'sus2':[0,2,7],
+  'add9':[0,4,7,14], 'madd9':[0,3,7,14],'9':[0,4,7,10,14],'maj9':[0,4,7,11,14],
+  'm9':[0,3,7,10,14],'aug':[0,4,8]
+};
+
+/* steps: [semitones above key root, quality, roman numeral] */
+const PROGS=[
+/* ---- Classics 1958 (Walter Stuart turnarounds) ---- */
+{name:'The Standard Turnaround',genre:'Classics 1958',moods:['Nostalgic'],
+ steps:[[0,'','I'],[9,'m','vi'],[2,'m7','ii7'],[7,'7','V7']]},
+{name:'Doo-Wop Standard',genre:'Classics 1958',moods:['Happy','Nostalgic'],
+ steps:[[0,'','I'],[9,'m','vi'],[5,'','IV'],[7,'','V']]},
+{name:'Borrowed Sunshine',genre:'Classics 1958',moods:['Sad','Romantic'],
+ steps:[[0,'','I'],[0,'7','I7'],[5,'','IV'],[5,'m','iv'],[0,'','I']]},
+{name:'Chromatic Climb',genre:'Classics 1958',moods:['Nostalgic'],
+ steps:[[0,'','I'],[1,'dim7','#i°7'],[2,'m7','ii7'],[7,'7','V7']]},
+{name:'Ragtime Cycle',genre:'Classics 1958',moods:['Happy','Nostalgic'],
+ steps:[[4,'7','III7'],[9,'7','VI7'],[2,'7','II7'],[7,'7','V7'],[0,'','I']]},
+{name:'Backdoor Slide',genre:'Classics 1958',moods:['Chill'],
+ steps:[[0,'','I'],[8,'7','bVI7'],[7,'7','V7'],[0,'','I']]},
+{name:'Tritone Trick',genre:'Classics 1958',moods:['Chill','Romantic'],
+ steps:[[2,'m7','ii7'],[1,'7','bII7'],[0,'maj7','Imaj7'],[0,'maj7','Imaj7']]},
+{name:'Stuart Special',genre:'Classics 1958',moods:['Dark','Nostalgic'],
+ steps:[[0,'','I'],[3,'7','bIII7'],[2,'m7','ii7'],[7,'7','V7']]},
+
+/* ---- Afrobeats ---- */
+{name:'Lagos Nights',genre:'Afrobeats',moods:['Groovy','Dark'],
+ steps:[[0,'m','i'],[8,'','VI'],[3,'','III'],[10,'','VII']]},
+{name:'Sunset Bounce',genre:'Afrobeats',moods:['Happy','Groovy'],
+ steps:[[9,'m','vi'],[7,'','V'],[5,'','IV'],[7,'','V']]},
+{name:'Island Sway',genre:'Afrobeats',moods:['Happy','Chill'],
+ steps:[[0,'add9','I(add9)'],[7,'','V'],[9,'m','vi'],[5,'','IV']]},
+{name:'Sweet Highlife',genre:'Afrobeats',moods:['Romantic','Happy'],
+ steps:[[5,'maj7','IVmaj7'],[7,'7','V7'],[4,'m7','iii7'],[9,'m','vi']]},
+{name:'Essence Glow',genre:'Afrobeats',moods:['Romantic','Chill'],
+ steps:[[2,'m7','ii7'],[7,'','V'],[0,'maj7','Imaj7'],[9,'m7','vi7']]},
+{name:'Palmwine Drift',genre:'Afrobeats',moods:['Chill','Nostalgic'],
+ steps:[[0,'','I'],[4,'m','iii'],[9,'m','vi'],[5,'','IV']]},
+
+/* ---- Amapiano ---- */
+{name:'Log Drum Roller',genre:'Amapiano',moods:['Groovy','Dark'],
+ steps:[[0,'m','i'],[10,'','VII'],[8,'','VI'],[10,'','VII']]},
+{name:'Private School',genre:'Amapiano',moods:['Chill','Romantic'],
+ steps:[[0,'m9','im9'],[5,'m9','ivm9'],[8,'maj7','VImaj7'],[7,'7','V7']]},
+{name:'Yano Glide',genre:'Amapiano',moods:['Chill','Groovy'],
+ steps:[[0,'m7','i7'],[3,'maj7','IIImaj7'],[8,'maj7','VImaj7'],[10,'sus4','VIIsus4']]},
+{name:'Soulful Keys',genre:'Amapiano',moods:['Romantic','Chill'],
+ steps:[[8,'maj7','VImaj7'],[7,'7','V7'],[0,'m7','i7'],[0,'m7','i7']]},
+{name:'Sgija Bounce',genre:'Amapiano',moods:['Hype','Groovy'],
+ steps:[[0,'m','i'],[7,'m','v'],[8,'','VI'],[10,'','VII']]},
+
+/* ---- Dancehall ---- */
+{name:'Riddim Two-Step',genre:'Dancehall',moods:['Groovy','Hype'],
+ steps:[[0,'m','i'],[10,'','VII'],[0,'m','i'],[10,'','VII']]},
+{name:'Bashment',genre:'Dancehall',moods:['Hype','Dark'],
+ steps:[[8,'','VI'],[10,'','VII'],[0,'m','i'],[0,'m','i']]},
+{name:'Wine Slow',genre:'Dancehall',moods:['Romantic','Groovy'],
+ steps:[[0,'m','i'],[3,'','III'],[10,'','VII'],[5,'m','iv']]},
+{name:'Day Party',genre:'Dancehall',moods:['Happy','Hype'],
+ steps:[[0,'','I'],[7,'','V'],[0,'','I'],[7,'','V']]},
+{name:'Badman',genre:'Dancehall',moods:['Dark','Hype'],
+ steps:[[0,'m','i'],[7,'m','v'],[5,'m','iv'],[0,'m','i']]},
+
+/* ---- Reggae ---- */
+{name:'One Drop Classic',genre:'Reggae',moods:['Chill','Happy'],
+ steps:[[0,'','I'],[5,'','IV'],[0,'','I'],[7,'','V']]},
+{name:'Roots Skank',genre:'Reggae',moods:['Groovy','Chill'],
+ steps:[[0,'m','i'],[10,'','VII'],[8,'','VI'],[10,'','VII']]},
+{name:'Lovers Rock',genre:'Reggae',moods:['Romantic','Nostalgic'],
+ steps:[[0,'','I'],[9,'m','vi'],[5,'','IV'],[7,'','V']]},
+{name:'Dub Circle',genre:'Reggae',moods:['Chill','Dark'],
+ steps:[[0,'m7','i7'],[5,'m7','iv7'],[10,'7','VII7'],[3,'maj7','IIImaj7']]},
+{name:'Island Praise',genre:'Reggae',moods:['Uplifting','Happy'],
+ steps:[[5,'','IV'],[7,'','V'],[0,'','I'],[0,'','I']]},
+
+/* ---- Hip Hop ---- */
+{name:'Boom Bap Loop',genre:'Hip Hop',moods:['Dark','Groovy'],
+ steps:[[0,'m7','i7'],[5,'m7','iv7'],[0,'m7','i7'],[5,'m7','iv7']]},
+{name:'Block Party',genre:'Hip Hop',moods:['Nostalgic','Groovy'],
+ steps:[[0,'m','i'],[8,'','VI'],[10,'','VII'],[0,'m','i']]},
+{name:'Jazz Rap Corner',genre:'Hip Hop',moods:['Chill','Dark'],
+ steps:[[2,'m7b5','iiø7'],[7,'7','V7'],[0,'m7','i7'],[0,'m7','i7']]},
+{name:'G-Funk Lean',genre:'Hip Hop',moods:['Groovy','Chill'],
+ steps:[[0,'m7','i7'],[5,'7','IV7'],[0,'m7','i7'],[5,'7','IV7']]},
+{name:'Soul Chop',genre:'Hip Hop',moods:['Nostalgic','Sad'],
+ steps:[[9,'m7','vi7'],[7,'7','V7'],[5,'maj7','IVmaj7'],[7,'7','V7']]},
+
+/* ---- Trap ---- */
+{name:'Dark Mode',genre:'Trap',moods:['Dark','Hype'],
+ steps:[[0,'m','i'],[8,'','VI'],[3,'','III'],[10,'','VII']]},
+{name:'Phrygian Pressure',genre:'Trap',moods:['Dark'],
+ steps:[[0,'m','i'],[1,'','bII'],[0,'m','i'],[1,'','bII']]},
+{name:'Cold Storage',genre:'Trap',moods:['Dark','Sad'],
+ steps:[[0,'m','i'],[5,'m','iv'],[8,'','VI'],[7,'7','V7']]},
+{name:'Stab Season',genre:'Trap',moods:['Dark','Hype'],
+ steps:[[0,'m','i'],[8,'','VI'],[7,'7','V7'],[0,'m','i']]},
+
+/* ---- Drill ---- */
+{name:'Sliding Drill',genre:'Drill',moods:['Dark','Hype'],
+ steps:[[0,'m','i'],[7,'m','v'],[8,'','VI'],[7,'m','v']]},
+{name:'UK Pressure',genre:'Drill',moods:['Dark'],
+ steps:[[0,'m','i'],[5,'m','iv'],[0,'m','i'],[7,'7','V7']]},
+{name:'Opps Theme',genre:'Drill',moods:['Dark','Epic'],
+ steps:[[0,'m','i'],[8,'','VI'],[3,'','III'],[7,'m','v']]},
+
+/* ---- R&B / Soul ---- */
+{name:'Silk Sheets',genre:'R&B / Soul',moods:['Romantic','Chill'],
+ steps:[[0,'maj7','Imaj7'],[9,'m7','vi7'],[2,'m7','ii7'],[7,'7','V7']]},
+{name:'Slow Descent',genre:'R&B / Soul',moods:['Romantic','Sad'],
+ steps:[[5,'maj7','IVmaj7'],[4,'m7','iii7'],[2,'m7','ii7'],[0,'maj7','Imaj7']]},
+{name:'Quiet Storm',genre:'R&B / Soul',moods:['Romantic','Chill'],
+ steps:[[2,'m9','ii9'],[7,'9','V9'],[0,'maj9','Imaj9'],[9,'m9','vi9']]},
+{name:'90s Slow Jam',genre:'R&B / Soul',moods:['Romantic','Nostalgic'],
+ steps:[[0,'maj7','Imaj7'],[9,'m7','vi7'],[5,'maj7','IVmaj7'],[7,'7','V7']]},
+{name:'Toxic Love',genre:'R&B / Soul',moods:['Sad','Dark'],
+ steps:[[9,'m','vi'],[7,'','V'],[5,'','IV'],[4,'7','III7']]},
+{name:'Motown Sun',genre:'R&B / Soul',moods:['Happy','Nostalgic'],
+ steps:[[0,'','I'],[5,'','IV'],[4,'m','iii'],[9,'m','vi']]},
+
+/* ---- Neo-Soul ---- */
+{name:'Velvet Ceiling',genre:'Neo-Soul',moods:['Chill','Romantic'],
+ steps:[[5,'maj9','IVmaj9'],[4,'m9','iii9'],[9,'m9','vi9'],[0,'maj9','Imaj9']]},
+{name:'Borrowed Glow',genre:'Neo-Soul',moods:['Dreamy','Chill'],
+ steps:[[0,'maj7','Imaj7'],[10,'maj7','bVIImaj7'],[5,'maj7','IVmaj7'],[0,'maj7','Imaj7']]},
+{name:'Dilla Backdoor',genre:'Neo-Soul',moods:['Chill','Nostalgic'],
+ steps:[[5,'m9','ivm9'],[10,'9','bVII9'],[0,'maj9','Imaj9'],[0,'maj9','Imaj9']]},
+{name:'Late Text',genre:'Neo-Soul',moods:['Romantic','Dreamy'],
+ steps:[[2,'m9','ii9'],[4,'m9','iii9'],[5,'maj9','IVmaj9'],[4,'m9','iii9']]},
+
+/* ---- Gospel ---- */
+{name:'Sunday Lift',genre:'Gospel',moods:['Uplifting','Happy'],
+ steps:[[0,'','I'],[4,'m7','iii7'],[9,'m7','vi7'],[2,'m7','ii7'],[7,'7','V7'],[0,'','I']]},
+{name:'Passing Praise',genre:'Gospel',moods:['Happy','Uplifting'],
+ steps:[[5,'','IV'],[6,'dim7','#iv°7'],[0,'','I'],[7,'7','V7'],[0,'','I']]},
+{name:'Amen Corner',genre:'Gospel',moods:['Uplifting','Nostalgic'],
+ steps:[[5,'','IV'],[0,'','I'],[5,'','IV'],[0,'','I']]},
+{name:'Walk-Up Shout',genre:'Gospel',moods:['Hype','Uplifting'],
+ steps:[[0,'','I'],[0,'7','I7'],[5,'','IV'],[6,'dim7','#iv°7'],[7,'7','V7'],[0,'','I']]},
+{name:'Choir Cycle',genre:'Gospel',moods:['Uplifting','Romantic'],
+ steps:[[4,'m7','iii7'],[9,'m7','vi7'],[2,'m7','ii7'],[7,'7','V7']]},
+
+/* ---- Pop ---- */
+{name:'The Axis',genre:'Pop',moods:['Happy','Epic'],
+ steps:[[0,'','I'],[7,'','V'],[9,'m','vi'],[5,'','IV']]},
+{name:'Sad Axis',genre:'Pop',moods:['Sad','Euphoric'],
+ steps:[[9,'m','vi'],[5,'','IV'],[0,'','I'],[7,'','V']]},
+{name:'Radio Gold',genre:'Pop',moods:['Happy','Hype'],
+ steps:[[0,'','I'],[5,'','IV'],[9,'m','vi'],[7,'','V']]},
+{name:'Bittersweet Pop',genre:'Pop',moods:['Sad','Romantic'],
+ steps:[[0,'','I'],[7,'','V'],[9,'m','vi'],[5,'m','iv']]},
+{name:'Pre-Chorus Lift',genre:'Pop',moods:['Euphoric','Uplifting'],
+ steps:[[2,'m','ii'],[5,'','IV'],[0,'','I'],[7,'','V']]},
+{name:'80s Glow',genre:'Pop',moods:['Nostalgic','Dreamy'],
+ steps:[[0,'','I'],[4,'m','iii'],[5,'','IV'],[7,'','V']]},
+
+/* ---- Smooth Rock ---- */
+{name:'Open Highway',genre:'Smooth Rock',moods:['Chill','Happy'],
+ steps:[[0,'','I'],[10,'','bVII'],[5,'','IV'],[0,'','I']]},
+{name:'Stadium Glow',genre:'Smooth Rock',moods:['Epic','Happy'],
+ steps:[[0,'','I'],[7,'','V'],[5,'','IV'],[5,'','IV']]},
+{name:'Coast Drive',genre:'Smooth Rock',moods:['Chill','Dreamy'],
+ steps:[[0,'maj7','Imaj7'],[5,'maj7','IVmaj7'],[0,'maj7','Imaj7'],[5,'maj7','IVmaj7']]},
+
+/* ---- Rock ---- */
+{name:'Garage Burner',genre:'Rock',moods:['Hype'],
+ steps:[[0,'','I'],[5,'','IV'],[7,'','V'],[5,'','IV']]},
+{name:'Grunge Cellar',genre:'Rock',moods:['Dark','Sad'],
+ steps:[[0,'m','i'],[3,'','bIII'],[10,'','bVII'],[8,'','bVI']]},
+{name:'Power Ballad',genre:'Rock',moods:['Epic','Sad'],
+ steps:[[0,'','I'],[10,'','bVII'],[8,'','bVI'],[10,'','bVII']]},
+{name:'Punk Sprint',genre:'Rock',moods:['Hype','Happy'],
+ steps:[[0,'','I'],[5,'','IV'],[7,'','V'],[7,'','V']]},
+
+/* ---- EDM / House ---- */
+{name:'Festival Minor',genre:'EDM / House',moods:['Euphoric','Hype'],
+ steps:[[9,'m','vi'],[5,'','IV'],[0,'','I'],[7,'','V']]},
+{name:'Main Stage Lift',genre:'EDM / House',moods:['Euphoric','Epic'],
+ steps:[[5,'','IV'],[7,'','V'],[9,'m','vi'],[0,'','I']]},
+{name:'Deep House Mood',genre:'EDM / House',moods:['Chill','Groovy'],
+ steps:[[0,'m7','i7'],[5,'m7','iv7'],[8,'maj7','VImaj7'],[7,'sus4','Vsus4']]},
+{name:'Progressive Dawn',genre:'EDM / House',moods:['Euphoric','Dreamy'],
+ steps:[[9,'m','vi'],[0,'','I'],[7,'','V'],[5,'','IV']]},
+{name:'Big Room Dusk',genre:'EDM / House',moods:['Hype','Dark'],
+ steps:[[0,'m','i'],[8,'','VI'],[10,'','VII'],[8,'','VI']]},
+
+/* ---- Jazz ---- */
+{name:'Two-Five-One',genre:'Jazz',moods:['Chill','Nostalgic'],
+ steps:[[2,'m7','ii7'],[7,'7','V7'],[0,'maj7','Imaj7'],[0,'maj7','Imaj7']]},
+{name:'Long Turnaround',genre:'Jazz',moods:['Groovy','Happy'],
+ steps:[[4,'m7','iii7'],[9,'7','VI7'],[2,'m7','ii7'],[7,'7','V7']]},
+{name:'Minor Resolution',genre:'Jazz',moods:['Dark','Sad'],
+ steps:[[2,'m7b5','iiø7'],[7,'7','V7'],[0,'m7','i7'],[0,'m7','i7']]},
+{name:'Rhythm A',genre:'Jazz',moods:['Happy','Groovy'],
+ steps:[[0,'maj7','Imaj7'],[9,'7','VI7'],[2,'m7','ii7'],[7,'7','V7']]},
+{name:'Ladybird Slide',genre:'Jazz',moods:['Dreamy','Chill'],
+ steps:[[0,'maj7','Imaj7'],[3,'maj7','bIIImaj7'],[8,'maj7','bVImaj7'],[1,'maj7','bIImaj7']]},
+
+/* ---- Lo-fi ---- */
+{name:'Study Break',genre:'Lo-fi',moods:['Chill'],
+ steps:[[2,'m9','ii9'],[7,'9','V9'],[0,'maj9','Imaj9'],[9,'m9','vi9']]},
+{name:'Rainy Backdoor',genre:'Lo-fi',moods:['Chill','Sad'],
+ steps:[[5,'m7','iv7'],[10,'7','bVII7'],[0,'maj7','Imaj7'],[0,'maj7','Imaj7']]},
+{name:'Sleep Loop',genre:'Lo-fi',moods:['Dreamy','Chill'],
+ steps:[[0,'maj9','Imaj9'],[9,'m9','vi9'],[0,'maj9','Imaj9'],[9,'m9','vi9']]},
+{name:'Tape Memory',genre:'Lo-fi',moods:['Nostalgic','Sad'],
+ steps:[[4,'m7','iii7'],[9,'m9','vi9'],[2,'m7','ii7'],[7,'9','V9']]},
+
+/* ---- Blues ---- */
+{name:'12-Bar Classic',genre:'Blues',moods:['Groovy','Nostalgic'],
+ steps:[[0,'7','I7'],[0,'7','I7'],[0,'7','I7'],[0,'7','I7'],
+        [5,'7','IV7'],[5,'7','IV7'],[0,'7','I7'],[0,'7','I7'],
+        [7,'7','V7'],[5,'7','IV7'],[0,'7','I7'],[7,'7','V7']]},
+{name:'Quick Change',genre:'Blues',moods:['Groovy','Happy'],
+ steps:[[0,'7','I7'],[5,'7','IV7'],[0,'7','I7'],[0,'7','I7'],
+        [5,'7','IV7'],[5,'7','IV7'],[0,'7','I7'],[7,'7','V7']]},
+{name:'Minor Blues',genre:'Blues',moods:['Sad','Dark'],
+ steps:[[0,'m7','i7'],[5,'m7','iv7'],[0,'m7','i7'],[7,'7','V7']]},
+
+/* ---- Country ---- */
+{name:'Dust Road',genre:'Country',moods:['Happy','Nostalgic'],
+ steps:[[0,'','I'],[5,'','IV'],[7,'','V'],[0,'','I']]},
+{name:'Heartland',genre:'Country',moods:['Nostalgic','Uplifting'],
+ steps:[[0,'','I'],[7,'','V'],[5,'','IV'],[0,'','I']]},
+{name:'Front Porch',genre:'Country',moods:['Chill','Happy'],
+ steps:[[0,'','I'],[2,'m','ii'],[5,'','IV'],[7,'','V']]},
+
+/* ---- Latin / Reggaeton ---- */
+{name:'Dem Bow',genre:'Latin / Reggaeton',moods:['Hype','Groovy'],
+ steps:[[0,'m','i'],[8,'','VI'],[10,'','VII'],[10,'','VII']]},
+{name:'Andalusian Fall',genre:'Latin / Reggaeton',moods:['Dark','Romantic'],
+ steps:[[0,'m','i'],[10,'','VII'],[8,'','VI'],[7,'','V']]},
+{name:'Bachata Rosa',genre:'Latin / Reggaeton',moods:['Romantic','Sad'],
+ steps:[[0,'m','i'],[5,'m','iv'],[7,'7','V7'],[0,'m','i']]},
+{name:'Cumbia Sun',genre:'Latin / Reggaeton',moods:['Happy','Groovy'],
+ steps:[[0,'','I'],[7,'7','V7'],[0,'','I'],[7,'7','V7']]},
+
+/* ---- Cinematic ---- */
+{name:'Lydian Dream',genre:'Cinematic',moods:['Dreamy','Epic'],
+ steps:[[0,'','I'],[2,'','II'],[0,'','I'],[2,'','II']]},
+{name:'Falling Sky',genre:'Cinematic',moods:['Epic','Sad'],
+ steps:[[0,'m','i'],[8,'','VI'],[5,'m','iv'],[7,'m','v']]},
+{name:'Last Stand',genre:'Cinematic',moods:['Epic','Dark'],
+ steps:[[0,'m','i'],[8,'','VI'],[0,'m','i'],[10,'','VII']]},
+{name:'Sea of Stars',genre:'Cinematic',moods:['Dreamy','Sad'],
+ steps:[[0,'','I'],[7,'m','v'],[0,'','I'],[7,'m','v']]},
+
+/* ---- Highlife ---- */
+{name:'Palm Court',genre:'Highlife',moods:['Happy','Nostalgic'],
+ steps:[[0,'','I'],[5,'','IV'],[7,'7','V7'],[0,'','I']]},
+{name:'Guitar Band',genre:'Highlife',moods:['Happy','Groovy'],
+ steps:[[2,'m7','ii7'],[7,'7','V7'],[0,'','I'],[0,'','I']]},
+{name:'Osibisa Roll',genre:'Highlife',moods:['Groovy','Uplifting'],
+ steps:[[0,'','I'],[5,'','IV'],[2,'m','ii'],[7,'7','V7']]},
+
+/* ---- Funk ---- */
+{name:'JB Vamp',genre:'Funk',moods:['Groovy','Hype'],
+ steps:[[0,'9','I9'],[5,'9','IV9'],[0,'9','I9'],[5,'9','IV9']]},
+{name:'Dorian Strut',genre:'Funk',moods:['Groovy'],
+ steps:[[0,'m9','im9'],[5,'9','IV9'],[0,'m9','im9'],[5,'9','IV9']]},
+{name:'Disco Ball',genre:'Funk',moods:['Happy','Hype'],
+ steps:[[2,'m7','ii7'],[7,'7','V7'],[0,'maj7','Imaj7'],[9,'m7','vi7']]},
+
+/* ---- Afro House ---- */
+{name:'Deep Continent',genre:'Afro House',moods:['Chill','Dark'],
+ steps:[[0,'m9','im9'],[8,'maj7','VImaj7'],[0,'m9','im9'],[8,'maj7','VImaj7']]},
+{name:'3-Step Drift',genre:'Afro House',moods:['Groovy','Dreamy'],
+ steps:[[0,'m','i'],[5,'m','iv'],[8,'','VI'],[10,'','VII']]},
+{name:'Drum Spirit',genre:'Afro House',moods:['Hype','Dark'],
+ steps:[[0,'m7','i7'],[10,'','VII'],[8,'maj7','VImaj7'],[10,'','VII']]}
+];
+
+const GENRES=['All',...[...new Set(PROGS.map(p=>p.genre))]];
+const MOODS=['All','Happy','Sad','Chill','Dark','Euphoric','Romantic','Hype','Groovy','Nostalgic','Epic','Uplifting','Dreamy'];
+
+/* ================= state ================= */
+let keyRoot=0;
+let genre='All', mood='All';
+let current=PROGS.find(p=>p.name==='Lagos Nights');
+let playing=false, playStart=0, totalDur=0, loopTimer=null, raf=null;
+let liveNodes=[];
+let audio=null;
+
+/* ================= helpers ================= */
+const names=()=>FLAT_KEYS.has(keyRoot)?FLAT:SHARP;
+const qLabel=q=>({'':'','m':'m','7':'7','maj7':'maj7','m7':'m7','6':'6','m6':'m6',
+  'dim':'dim','dim7':'dim7','m7b5':'m7b5','sus4':'sus4','sus2':'sus2','add9':'add9',
+  'madd9':'m(add9)','9':'9','maj9':'maj9','m9':'m9','aug':'aug'})[q];
+
+function chordOf(step){
+  const [off,q]=step;
+  const pc=(keyRoot+off)%12;
+  const bass=36+pc;
+  const upRoot=60+pc;
+  const tones=Q[q].map(i=>upRoot+i);
+  return {label:names()[pc]+qLabel(q), notes:[bass,...tones], bassIdx:0};
+}
+
+const midiName=m=>names()[m%12]+(Math.floor(m/12)-1);
+const isBlack=m=>[1,3,6,8,10].includes(m%12);
+
+/* ================= piano roll render ================= */
+const RH=16, BAR_W=176;
+document.documentElement.style.setProperty('--rh',RH+'px');
+
+function render(){
+  const chords=current.steps.map(chordOf);
+  document.getElementById('progName').textContent=current.name+' · '+current.genre;
+  document.getElementById('progNums').textContent=current.steps.map(s=>s[2]).join(' – ');
+  document.getElementById('progChords').textContent=
+    'in '+names()[keyRoot]+':  '+chords.map(c=>c.label).join('  –  ');
+
+  const all=chords.flatMap(c=>c.notes);
+  const lo=Math.min(...all)-1, hi=Math.max(...all)+2;
+  const rows=hi-lo+1, H=rows*RH, W=chords.length*BAR_W;
+
+  const inner=document.getElementById('rollInner');
+  inner.innerHTML='';
+
+  const keys=document.createElement('div'); keys.className='keys';
+  for(let m=hi;m>=lo;m--){
+    const k=document.createElement('div');
+    k.className='key '+(isBlack(m)?'black':'white')+(m%12===0?' c-note':'');
+    k.textContent=isBlack(m)?'':midiName(m);
+    keys.appendChild(k);
+  }
+  inner.appendChild(keys);
+
+  const grid=document.createElement('div'); grid.className='grid';
+  grid.style.width=W+'px'; grid.style.height=H+'px';
+  for(let m=hi;m>=lo;m--){
+    const r=document.createElement('div');
+    r.className='row '+(isBlack(m)?'black':'white')+(m%12===11?' c-line':'');
+    r.style.top=(hi-m)*RH+'px';
+    grid.appendChild(r);
+  }
+  for(let b=0;b<chords.length;b++){
+    for(let beat=0;beat<4;beat++){
+      const v=document.createElement('div');
+      v.className='vline'+(beat===0?' bar':'');
+      v.style.left=(b*BAR_W+beat*BAR_W/4)+'px';
+      grid.appendChild(v);
+    }
+    const n=document.createElement('div');
+    n.className='barnum'; n.style.left=(b*BAR_W+2)+'px'; n.textContent=b+1;
+    grid.appendChild(n);
+  }
+  chords.forEach((c,b)=>{
+    c.notes.forEach((m,i)=>{
+      const d=document.createElement('div');
+      d.className='note'+(i===c.bassIdx?' bass':'');
+      d.style.top=(hi-m)*RH+'px';
+      d.style.left=(b*BAR_W+1)+'px';
+      d.style.width=(BAR_W-4)+'px';
+      d.textContent=midiName(m);
+      grid.appendChild(d);
+    });
+  });
+
+  const ph=document.createElement('div'); ph.className='playhead'; ph.id='playhead';
+  grid.appendChild(ph);
+  inner.appendChild(grid);
+}
+
+/* ================= audio ================= */
+function ensureAudio(){ if(!audio) audio=new (window.AudioContext||window.webkitAudioContext)(); return audio; }
+
+function scheduleChord(notes,t,dur){
+  const ctx=audio;
+  notes.forEach((m,i)=>{
+    const f=440*Math.pow(2,(m-69)/12);
+    const o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+    o.type=i===0?'sawtooth':'triangle';
+    lp.type='lowpass'; lp.frequency.value=i===0?700:2400;
+    o.frequency.value=f;
+    const v=(i===0?0.16:0.11)/Math.sqrt(notes.length-1||1);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(v,t+0.02);
+    g.gain.setValueAtTime(v,t+dur*0.6);
+    g.gain.linearRampToValueAtTime(0.0001,t+dur*0.97);
+    o.connect(lp); lp.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t+dur);
+    liveNodes.push(o);
+  });
+}
+
+function schedulePass(start){
+  const bpm=+document.getElementById('bpm').value||100;
+  const barDur=240/bpm;
+  const chords=current.steps.map(chordOf);
+  chords.forEach((c,b)=>scheduleChord(c.notes,start+b*barDur,barDur));
+  totalDur=chords.length*barDur;
+  return totalDur;
+}
+
+function animate(){
+  const ph=document.getElementById('playhead');
+  if(!playing||!ph){return}
+  const t=(audio.currentTime-playStart)%totalDur;
+  ph.style.display='block';
+  ph.style.left=(t/totalDur*current.steps.length*BAR_W)+'px';
+  raf=requestAnimationFrame(animate);
+}
+
+function play(){
+  ensureAudio();
+  if(audio.state==='suspended') audio.resume();
+  stopAll(false);
+  playing=true;
+  document.getElementById('playBtn').textContent='■ Stop';
+  document.getElementById('playBtn').classList.add('playing');
+  playStart=audio.currentTime+0.06;
+  const dur=schedulePass(playStart);
+  const loopFn=()=>{
+    if(!playing) return;
+    if(document.getElementById('loop').checked){
+      schedulePass(audio.currentTime+0.03);
+      playStart=audio.currentTime+0.03;
+      loopTimer=setTimeout(loopFn,dur*1000-40);
+    } else { stopAll(true); }
+  };
+  loopTimer=setTimeout(loopFn,dur*1000-40);
+  animate();
+}
+
+function stopAll(resetBtn){
+  playing=false;
+  clearTimeout(loopTimer);
+  cancelAnimationFrame(raf);
+  liveNodes.forEach(o=>{try{o.stop()}catch(e){}});
+  liveNodes=[];
+  const ph=document.getElementById('playhead');
+  if(ph) ph.style.display='none';
+  if(resetBtn!==false){
+    document.getElementById('playBtn').textContent='▶ Play';
+    document.getElementById('playBtn').classList.remove('playing');
+  }
+}
+
+/* ================= UI build ================= */
+function buildKeySelect(){
+  const sel=document.getElementById('keySel');
+  SHARP.forEach((n,i)=>{
+    const o=document.createElement('option');
+    o.value=i; o.textContent=FLAT_KEYS.has(i)?FLAT[i]:n;
+    sel.appendChild(o);
+  });
+  sel.value=keyRoot;
+  sel.onchange=()=>{keyRoot=+sel.value; render(); buildList(); if(playing) play();};
+}
+
+function buildChips(boxId,items,activeVal,onPick,extraClass){
+  const box=document.getElementById(boxId); box.innerHTML='';
+  items.forEach(g=>{
+    const c=document.createElement('button');
+    c.className='chip'+(g===activeVal?' active':'');
+    c.textContent=g;
+    c.onclick=()=>onPick(g);
+    box.appendChild(c);
+  });
+}
+
+function refreshChips(){
+  buildChips('genreChips',GENRES,genre,g=>{genre=g; refreshChips(); buildList();});
+  buildChips('moodChips',MOODS,mood,m=>{mood=m; refreshChips(); buildList();});
+}
+
+function filtered(){
+  return PROGS.filter(p=>
+    (genre==='All'||p.genre===genre)&&
+    (mood==='All'||p.moods.includes(mood)));
+}
+
+function buildList(){
+  const box=document.getElementById('list'); box.innerHTML='';
+  const items=filtered();
+  document.getElementById('count').textContent=
+    items.length+' progression'+(items.length===1?'':'s');
+  items.forEach(p=>{
+    const card=document.createElement('button');
+    card.className='card'+(p===current?' active':'');
+    const inKey=p.steps.map(s=>names()[(keyRoot+s[0])%12]+qLabel(s[1])).join(' – ');
+    card.innerHTML=
+      '<div class="top"><span class="name">'+p.name+'</span>'+
+      '<span class="mood">'+p.moods.join(' · ')+'</span></div>'+
+      '<div class="genre-tag">'+p.genre+'</div>'+
+      '<div class="nums">'+p.steps.map(s=>s[2]).join(' – ')+'</div>'+
+      '<div class="in-key">'+inKey+'</div>';
+    card.onclick=()=>{
+      current=p; buildList(); render();
+      document.querySelector('.roll-panel').scrollIntoView({behavior:'smooth',block:'start'});
+      if(playing) play();
+    };
+    box.appendChild(card);
+  });
+}
+
+document.getElementById('playBtn').onclick=()=>playing?stopAll():play();
+document.getElementById('bpm').onchange=()=>{ if(playing) play(); };
+
+buildKeySelect(); refreshChips(); buildList(); render();
+
+/* ================= offline (PWA) ================= */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
